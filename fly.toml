@@ -7,5 +7,5 @@ app = "gymtide-bot"  # Замени на имя своего Fly.io-прилож
   PYTHONUNBUFFERED = "1"
 
 [processes]
-  app = "python /fitness_bot.py"
+  app = "python fitness_bot.py"
 
