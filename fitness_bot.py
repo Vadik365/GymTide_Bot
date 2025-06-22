@@ -1,26 +1,35 @@
-import logging
+import os
 import csv
+import logging
+from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher, types
+from aiogram.enums import ParseMode
+from aiogram.types import (
+    Message, ReplyKeyboardMarkup, KeyboardButton, InputFile
+)
 from aiogram.filters import Command
+from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
-from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
 
+# Загружаем переменные окружения
+load_dotenv()
+
 # Настройки
-API_TOKEN = "7345572170:AAEH7Cf6IZC4t48hWUkOfqL8Qh7SB9kFVZ4"  # Вставь сюда свой токен!
-ADMIN_ID = 7678402237  # Твой ID
+# Переменная из .env
+API_TOKEN = os.getenv("API_TOKEN")
+ADMIN_ID = int(os.getenv("ADMIN_ID", 0))  # ID администратора
 
 # Логирование
 logging.basicConfig(level=logging.INFO)
 
-# Бот и диспетчер
-bot = Bot(token=API_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+# Инициализация бота и диспетчера
+bot = Bot(token=API_TOKEN, default=DefaultBotProperties(
+    parse_mode=ParseMode.HTML))
 dp = Dispatcher(storage=MemoryStorage())
 
-# Переводы
+# Мультиязычные сообщения
 translations = {
     'ru': {
         'greeting': "Привет! Я помогу составить тебе программу тренировок.",
@@ -63,6 +72,7 @@ translations = {
     }
 }
 
+# Порядок вопросов и ключи для CSV
 questions = [
     ("name", "name"),
     ("age", "age"),
@@ -72,14 +82,11 @@ questions = [
     ("frequency", "frequency")
 ]
 
-# FSM состояния
-class Form(StatesGroup):
-    filling = State()
-
-# Языковая клавиатура
+# Клавиатура выбора языка
 lang_keyboard = ReplyKeyboardMarkup(
     keyboard=[
-        [KeyboardButton(text="🇬🇧 English"), KeyboardButton(text="🇺🇦 Українська"), KeyboardButton(text="🇷🇺 Русский")]
+        [KeyboardButton(text="🇬🇧 English"), KeyboardButton(
+            text="🇺🇦 Українська"), KeyboardButton(text="🇷🇺 Русский")]
     ],
     resize_keyboard=True
 )
@@ -90,29 +97,38 @@ lang_map = {
     "🇷🇺 Русский": "ru",
 }
 
+# Состояния FSM
+
+
+class Form(StatesGroup):
+    filling = State()
+
 # Команда /start
+
+
 @dp.message(Command("start"))
-async def cmd_start(message: Message, state: FSMContext):
+async def start_cmd(message: Message, state: FSMContext):
     user_id = message.from_user.id
     if user_id == ADMIN_ID:
         admin_keyboard = ReplyKeyboardMarkup(
-            keyboard=[
-                [KeyboardButton(text="/list")],
-                [KeyboardButton(text="/send")]
-            ],
+            keyboard=[[KeyboardButton(text="/list")],
+                      [KeyboardButton(text="/sendfile")]],
             resize_keyboard=True
         )
-        await message.answer(f"Твой Telegram ID: {user_id}\nПривет, Админ! Ты можешь использовать команды /list и /send.",
-                             reply_markup=admin_keyboard)
+        await message.answer(f"Привет, Админ!\nТвой Telegram ID: {user_id}", reply_markup=admin_keyboard)
         await state.clear()
     else:
-        await message.answer("Please choose a language / Будь ласка, обери мову/ Пожалуйста, выбери язык :", reply_markup=lang_keyboard)
+        await message.answer(translations['ru']['choose_language'], reply_markup=lang_keyboard)
         await state.clear()
 
-# Выбор языка
+# Выбор языка и начало анкеты
+
+
 @dp.message()
-async def choose_language(message: Message, state: FSMContext):
+async def process_language_or_answer(message: Message, state: FSMContext):
     lang = lang_map.get(message.text)
+    current_state = await state.get_state()
+
     if lang:
         await state.update_data(lang=lang, current_question=0, answers={})
         await message.answer(translations[lang]['greeting'])
@@ -120,119 +136,121 @@ async def choose_language(message: Message, state: FSMContext):
         await state.set_state(Form.filling)
         return
 
-    # Если уже в процессе анкеты
-    current_state = await state.get_state()
     if current_state == Form.filling:
-        await process_answer(message, state)
+        await process_question(message, state)
 
-# Обработка ответов на вопросы
-async def process_answer(message: Message, state: FSMContext):
+# Обработка ответов на анкету
+
+
+async def process_question(message: Message, state: FSMContext):
     data = await state.get_data()
     lang = data.get("lang", "ru")
-    current_index = data.get("current_question", 0)
+    index = data.get("current_question", 0)
     answers = data.get("answers", {})
 
-    key = questions[current_index][0]
+    key = questions[index][0]
     answers[key] = message.text
 
-    if "language" not in answers:
-        answers["language"] = lang
+    # Сохраняем язык и username
+    answers["language"] = lang
+    answers["username"] = message.from_user.username or "—"
 
-    current_index += 1
-    if current_index < len(questions):
-        await state.update_data(current_question=current_index, answers=answers)
-        await message.answer(translations[lang]['questions'][current_index])
+    index += 1
+    if index < len(questions):
+        await state.update_data(current_question=index, answers=answers)
+        await message.answer(translations[lang]['questions'][index])
     else:
         await message.answer(translations[lang]['thanks'])
-        await send_application_to_admin(message.from_user.id, answers)
+        await send_to_admin(message.from_user.id, answers)
         save_to_csv(message.from_user.id, answers)
         await state.clear()
 
 # Отправка анкеты админу
-async def send_application_to_admin(user_id, data):
-    language = data.get('language', 'не указан')
+
+
+async def send_to_admin(user_id: int, data: dict):
     text = (
-        f"<b>Новая анкета</b>\n\n"
-        f"Telegram ID: {user_id}\n"
-        f"Язык: {data.get('language', 'не указан')}\n"
-        f"Имя: {data.get('name', '')}\n"
-        f"Возраст: {data.get('age', '')}\n"
-        f"Вес: {data.get('weight', '')}\n"
-        f"Здоровье: {data.get('health', '')}\n"
-        f"Цель: {data.get('goal', '')}\n"
-        f"Частота занятий: {data.get('frequency', '')}"
+        "<b>Новая анкета</b>\n\n"
+        f"Telegram ID: <code>{user_id}</code>\n"
+        f"Username: @{data.get('username')}\n"
+        f"Язык: {data.get('language')}\n"
+        f"Имя: {data.get('name')}\n"
+        f"Возраст: {data.get('age')}\n"
+        f"Вес: {data.get('weight')}\n"
+        f"Здоровье: {data.get('health')}\n"
+        f"Цель: {data.get('goal')}\n"
+        f"Частота: {data.get('frequency')}"
     )
     await bot.send_message(chat_id=ADMIN_ID, text=text, parse_mode=ParseMode.HTML)
 
-# Сохранение в CSV
-def save_to_csv(user_id, data):
-    with open("applications.csv", "a", newline="", encoding="utf-8") as csvfile:
-        writer = csv.writer(csvfile)
-        row = [user_id, data.get("language", "")] + [data.get(q[0], "") for q in questions]
-        writer.writerow(row)
+# Сохранение анкеты
+
+
+def save_to_csv(user_id: int, data: dict):
+    file_exists = os.path.isfile("applications.csv")
+    with open("applications.csv", "a", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        if not file_exists:
+            writer.writerow(["user_id", "username", "language"] + [q[0]
+                            for q in questions])
+        writer.writerow([user_id, data.get("username", ""), data.get(
+            "language", "")] + [data.get(q[0], "") for q in questions])
 
 # Команда /list
+
+
 @dp.message(Command("list"))
 async def cmd_list(message: Message):
     if message.from_user.id != ADMIN_ID:
         return
     try:
-        with open("applications.csv", "r", encoding="utf-8") as csvfile:
-            rows = csvfile.readlines()
-            if not rows:
-                await message.answer("Анкет пока нет.")
-                return
-            text = f"Всего анкет: {len(rows)}"
-            await message.answer(text)
+        with open("applications.csv", encoding="utf-8") as f:
+            rows = f.readlines()
+            await message.answer(f"Всего анкет: {len(rows)-1 if len(rows) > 1 else 0}")
     except FileNotFoundError:
         await message.answer("Файл с анкетами не найден.")
 
-# Команда /send
+# Команда /send <user_id> <сообщение>
+
+
 @dp.message(Command("send"))
-async def handle_send_command(message: Message):
+async def cmd_send(message: Message):
     if message.from_user.id != ADMIN_ID:
         return
-
     args = message.text.split(maxsplit=2)
-
-    if len(args) == 1:
-        try:
-            with open("applications.csv", "r", encoding="utf-8") as csvfile:
-                rows = csv.reader(csvfile)
-                text = ""
-                for row in rows:
-                    text += (
-                        f"\n\nTelegram ID: {row[0]}"
-                        f"\nИмя: {row[1]}"
-                        f"\nВозраст: {row[2]}"
-                        f"\nВес: {row[3]}"
-                        f"\nЗдоровье: {row[4]}"
-                        f"\nЦель: {row[5]}"
-                        f"\nЧастота занятий: {row[6]}"
-                        f"\n{'-'*20}"
-                    )
-                if text:
-                    await message.answer(f"<b>Список анкет:</b>{text}", parse_mode=ParseMode.HTML)
-                else:
-                    await message.answer("Анкет пока нет.")
-        except FileNotFoundError:
-            await message.answer("Файл с анкетами не найден.")
+    if len(args) < 3:
+        await message.answer("❗ Формат: /send <user_id> <сообщение>")
         return
+    try:
+        user_id = int(args[1])
+        text = args[2]
+        await bot.send_message(chat_id=user_id, text=text)
+        await message.answer(f"✅ Сообщение отправлено пользователю {user_id}.")
+    except Exception as e:
+        await message.answer(f"⚠️ Ошибка: {e}")
 
-    if len(args) >= 3:
-        try:
-            user_id = int(args[1])
-            text_to_send = args[2]
-            await bot.send_message(chat_id=user_id, text=text_to_send)
-            await message.answer(f"Сообщение отправлено пользователю {user_id}.")
-        except ValueError:
-            await message.answer("❌ user_id должен быть числом.")
-        except Exception as e:
-            await message.answer(f"⚠️ Ошибка: {e}")
+# Команда /sendfile <user_id> <путь_к_файлу>
+
+
+@dp.message(Command("sendfile"))
+async def cmd_sendfile(message: Message):
+    if message.from_user.id != ADMIN_ID:
         return
+    args = message.text.split(maxsplit=2)
+    if len(args) < 3:
+        await message.answer("❗ Формат: /sendfile <user_id> <путь_к_файлу>")
+        return
+    try:
+        user_id = int(args[1])
+        path = args[2]
+        if not os.path.exists(path):
+            await message.answer("❌ Файл не найден.")
+            return
+        await bot.send_document(chat_id=user_id, document=InputFile(path))
+        await message.answer("📎 Файл отправлен.")
+    except Exception as e:
+        await message.answer(f"⚠️ Ошибка при отправке: {e}")
 
-    await message.answer("❗ Неверный формат. Используй /send <user_id> <сообщение>")
-
-# Запуск
+# Запуск бота
 if __name__ == "__main__":
     dp.run_polling(bot)

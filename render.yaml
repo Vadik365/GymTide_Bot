@@ -1,9 +1,0 @@
-services:
-  - type: web
-    name: gymtide-bot
-    env: python
-    plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: python fitness_bot.py
-    pythonVersion: 3.11.9
-
