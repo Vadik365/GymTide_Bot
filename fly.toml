@@ -1,11 +1,10 @@
 app = "gymtide-bot"  # Замени на имя своего Fly.io-приложения
 
+
 [build]
-  image = "python:3.11"
+  dockerfile = "Dockerfile"
 
 [env]
   PYTHONUNBUFFERED = "1"
 
-[processes]
-  app = "python fitness_bot.py"
 
