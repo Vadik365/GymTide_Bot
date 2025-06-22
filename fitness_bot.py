@@ -11,7 +11,7 @@ from aiogram.filters import Command
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.client.default import DefaultBotProperties
+from aiogram.client.bot import Bot
 
 # Загружаем переменные окружения
 load_dotenv()
@@ -25,7 +25,7 @@ ADMIN_ID = int(os.getenv("ADMIN_ID", 0))  # ID администратора
 logging.basicConfig(level=logging.INFO)
 
 # Инициализация бота и диспетчера
-bot = Bot(token=API_TOKEN, default=DefaultBotProperties(
+bot = Bot(token=API_TOKEN, default=Bot(
     parse_mode=ParseMode.HTML))
 dp = Dispatcher(storage=MemoryStorage())
 
