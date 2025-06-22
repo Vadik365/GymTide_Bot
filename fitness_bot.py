@@ -25,8 +25,7 @@ ADMIN_ID = int(os.getenv("ADMIN_ID", 0))  # ID администратора
 logging.basicConfig(level=logging.INFO)
 
 # Инициализация бота и диспетчера
-bot = Bot(token=API_TOKEN, default=Bot(
-    parse_mode=ParseMode.HTML))
+bot = Bot(token=API_TOKEN, parse_mode=ParseMode.HTML)
 dp = Dispatcher(storage=MemoryStorage())
 
 # Мультиязычные сообщения
