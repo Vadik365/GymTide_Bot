@@ -32,7 +32,6 @@ translations = {
             "Как тебя зовут?",
             "Сколько тебе лет?",
             "Какой у тебя вес?",
-            "Есть ли у тебя проблемы со здоровьем?",
             "Какая твоя основная фитнес-цель?",
             "Как часто ты планируешь заниматься?"
         ]
@@ -45,7 +44,6 @@ translations = {
             "Як тебе звати?",
             "Скільки тобі років?",
             "Яка в тебе вага?",
-            "Чи маєш проблеми зі здоров’ям?",
             "Яка твоя основна фітнес-мета?",
             "Як часто плануєш тренуватися?"
         ]
@@ -58,7 +56,6 @@ translations = {
             "What is your name?",
             "How old are you?",
             "What is your weight?",
-            "Do you have any health problems?",
             "What is your main fitness goal?",
             "How often do you plan to work out?"
         ]
@@ -136,7 +133,6 @@ async def send_to_admin(user_id: int, data: dict):
         f"Имя: {data.get('name')}\n"
         f"Возраст: {data.get('age')}\n"
         f"Вес: {data.get('weight')}\n"
-        f"Здоровье: {data.get('health')}\n"
         f"Цель: {data.get('goal')}\n"
         f"Частота: {data.get('frequency')}"
     )
