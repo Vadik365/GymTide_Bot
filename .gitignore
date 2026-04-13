@@ -1,3 +1,30 @@
+# Environment
+.env
+
+# Virtual environment
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
+
+# OS files
+.DS_Store
+_.DS_Store
+
+# Data files
+applications.csv
+test.txt
+_test.txt
+
+# Git/GitHub folders
+_.git
+_.github
+_.idea
+_.venv
+_requirements.txt
+
+# Python cache
 __pycache__/
 *.pyc
-
