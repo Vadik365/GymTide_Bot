@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Environment
 .env
 
@@ -28,3 +29,8 @@ _requirements.txt
 # Python cache
 __pycache__/
 *.pyc
+=======
+__pycache__/
+*.pyc
+.env
+>>>>>>> 004908d93d5c970e9ad6908ccc53c91fbd67d7ba
