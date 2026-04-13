@@ -1,2 +1,2 @@
-aiogram==3.27.0.post0
+aiogram==3.7.0
 python-dotenv
